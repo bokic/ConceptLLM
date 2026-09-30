@@ -45,7 +45,8 @@ flowchart TD
     end
 
     UserIn --> NLParser & ASTParser & ByteEncoder
-    NLParser & ASTParser & ByteEncoder --> UpstreamTokens                                                                                                                                          UpstreamTokens --> ServerModel
+    NLParser & ASTParser & ByteEncoder --> UpstreamTokens
+    UpstreamTokens --> ServerModel
     ServerModel <--> KVCache
     ServerModel --> DownstreamTokens
     DownstreamTokens --> NLDecoder & ASTPrinter
@@ -62,10 +63,11 @@ Instead of arbitrary byte-pair statistics, the vocabulary space is strictly part
 | :--- | :--- | :--- | :--- |
 | **Semantic Concepts** | `0x0000 – 0x464F` | ~18,000 | Canonical root concepts (lemmas), actions, universal entities, and semantic relationships (e.g., `[ACTION:ACCELERATE]`, `[CONCEPT:PHOTOSYNTHESIS]`). |
 | **AST Code Nodes** | `0x4650 – 0x4E1F` | ~2,000 | Language-agnostic programming AST nodes (e.g., `[FOR_LOOP]`, `[BIN_OP:ADD]`, `[TRY_CATCH]`, `[VAR_DECL]`). Guaranteed syntax validity. |
-   | **Byte Fallback** | `0x4E20 – 0x4F1F` | 256 | Raw byte values (`0x00 – 0xFF`) for arbitrary literals, UUIDs, cryptographic hashes, and rare mathematical notation. |
-| **Special Control** | `0x4F20 – 0x4FFF` | ~224 | Framing, delimiters, modality switches, and `<EOS>` markers. |                                                                              | **Total** | | **~20,480** | **Complete, closed-loop representation of language, code, and raw data.** |
+| **Byte Fallback** | `0x4E20 – 0x4F1F` | 256 | Raw byte values (`0x00 – 0xFF`) for arbitrary literals, UUIDs, cryptographic hashes, and rare mathematical notation. |
+| **Special Control** | `0x4F20 – 0x4FFF` | ~224 | Framing, delimiters, modality switches, and `<EOS>` markers. |
+| **Total** | | **~20,480** | **Complete, closed-loop representation of language, code, and raw data.** |
 
-                                                                                      ---
+---
 
 ## 4. Operational Walkthrough
 
