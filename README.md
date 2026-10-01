@@ -18,6 +18,8 @@ Current frontier Large Language Models (LLMs) suffer from severe architectural i
 
 ## 2. System Architecture
 
+### 2.1 Component Architecture
+
 ```mermaid
 flowchart TD
     subgraph Client ["Client Device (Phone / Laptop / Edge Node)"]
@@ -52,6 +54,41 @@ flowchart TD
     DownstreamTokens --> NLDecoder & ASTPrinter
     NLDecoder & ASTPrinter --> FinalOut
 ```
+
+### 2.2 End-to-End Client-Server Flow
+
+```mermaid
+flowchart LR
+    subgraph Client ["Client Side (Local Edge Device)"]
+        direction TB
+        C1["1. User enters text or code"]
+        C2["Client-side small/fast LLM: Compresses text/code into ~20k unique tokens"]
+        C3["5. Client-side small/fast LLM: Converts ~20k token pool into output"]
+        C4["Rendered Output: Fully correct English/multilingual sentences or computer code"]
+
+        C1 --> C2
+        C3 --> C4
+    end
+
+    subgraph Server ["Server Side (Cloud Reasoning Engine)"]
+        direction TB
+        S1["3. Server-side processing: Processes input concept tokens in ~20k space"]
+        S2["Server-side generation: Produces output tokens in ~20k token pool"]
+
+        S1 --> S2
+    end
+
+    C2 -->|"2. Transport ~20k tokens to server side"| S1
+    S2 -->|"4. Transport ~20k output tokens to client side"| C3
+```
+
+**Execution Pipeline:**
+1. **User Input:** User enters text or code on the client device. A small, fast client-side LLM compresses the input into a compact representation using a ~20k unique token pool.
+2. **Upstream Transport:** The ~20k concept tokens are transported across the network to the server.
+3. **Server Processing & Generation:** The server-side core model processes the input tokens and produces output tokens, working entirely within the ~20k concept token pool.
+4. **Downstream Transport:** The generated output tokens (~20k token size pool) are transported across the network to the client.
+5. **Client Reconstruction:** The client-side LLM converts the ~20k token pool into fully correct, grammatical English (or other language) sentences or formatted computer code.
+
 
 ---
 
