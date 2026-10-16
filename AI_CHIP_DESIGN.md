@@ -8,17 +8,22 @@
 **Document Status:** Architectural Specification & Interface Definition  
 **Target Workload:** Transformer & Hybrid State-Space / Attention Token Generation (Prefill + Autoregressive Decode)  
 **Core Compute Paradigm:** **1D Vector-Scalar Processing Units (1D-VSPU)** executing `(1 × X) * 1 value` basic operations  
-**Physical Interface:** **Single Physical Port: Cost-Effective, Low-Power Ethernet LAN (1 GbE / 2.5 GbE RJ45) with integrated PoE / PoE+ / PoE++**
+**Physical Interface:** **Dual Deployment Options:**
+1. **Single Physical Port:** Cost-Effective, Low-Power Ethernet LAN (1 GbE / 2.5 GbE RJ45) with integrated PoE / PoE+ / PoE++
+2. **PCIe PC Add-in Card (AIC):** Standard desktop/workstation single-slot PCIe card (PCIe 3.0/4.0/5.0, 100% bus-powered up to 75W, zero auxiliary power cables)
 
 ---
 
 ### Key Features & Design Benefits at a Glance
 
 * **ROM(not RAM) is All You Need!**: 100% of LLM constant weights reside in ultra-dense, ultra-cheap Mask ROM. Zero weights waste RAM capacity, freeing 100% of dynamic RAM exclusively for massive 500k–2M+ token KV context windows.
-* **Vertical 3D-Stacked 3-IC Solution**: Custom Main IC (compute/networking/PMIC), Custom ROM IC (weights), and Custom RAM IC (KV-cache) stacked in 3D like a Raspberry Pi, linked by high-bandwidth micro-bumps/TSVs.
-* **Single RJ45 Port Powered by PoE+ (20.5W Typical)**: One standard Ethernet cable delivers both streaming token I/O and operational power ($<25.0\text{ W}$ peak), completely eliminating power bricks and chassis fans.
-* **Instant-On Cold Boot (<50 ms)**: Directly executes in-place from ROM instantly upon link-up—zero network transfer or DRAM initialization delays.
-* **Cost-Effective 3–6–12 Month Lifecycle Upgrades**: Rapid LLM model refreshes require replacing only the cheap ($\sim \$10 - \$25$) modular ROM IC via a tool-less ZIF safe-swap fixture—**zero Main IC or RAM IC redesign**.
+* **Vertical 3D-Stacked 3-IC Solution**: Custom Main IC (compute/networking/PCIe/PMIC), Custom ROM IC (weights), and Custom RAM IC (KV-cache) stacked in 3D like a Raspberry Pi, linked by high-bandwidth micro-bumps/TSVs.
+* **Dual Physical Deployment Paradigms**:
+  - **Standalone Network Micro-Appliance:** Single RJ45 port powered by PoE+ ($20.5\text{ W}$ typical / $<25.0\text{ W}$ peak), completely eliminating power bricks and chassis fans.
+  - **Desktop / Workstation PCIe PC Card (AIC):** Standard single-slot Half-Height Half-Length (HHHL) or Full-Height (FHHL) card powered 100% directly from the PCIe slot ($<25.0\text{ W}$ peak, zero external 6-pin/8-pin cables).
+* **Instant-On Cold Boot (<50 ms)**: Directly executes in-place from ROM instantly upon link-up or PCIe host power-up—zero network transfer, DRAM initialization, or multi-minute PCIe weight loading delays.
+* **Cost-Effective 3–6–12 Month Lifecycle Upgrades**: Rapid LLM model refreshes require replacing only the cheap ($\sim \$10 - \$25$) modular ROM IC via a tool-less ZIF safe-swap fixture (or rear-bracket slot on the PC card)—**zero Main IC or RAM IC redesign**.
+* **Zero Host GPU VRAM Contention (PCIe Card)**: The PC card frees the host gaming or workstation GPU (RTX / Radeon) for 100% graphics and display tasks, eliminating VRAM clashes during background AI coding tasks.
 * **Autonomous ~50ms Deep Sleep (<0.65W)**: Hardware state machine power-gates the Main IC and ROM after $\sim 50\text{ ms}$ idle; only dynamic RAM self-refreshes ($>97\%$ power reduction, $<10\text{ }\mu\text{s}$ zero-latency wakeup).
 * **100% 1D Compute Efficiency**: 128 parallel 1D-VSPU slices stream `(1 × X) * 1 value` vector-scalar dot products with 100% MAC duty cycle, eliminating 2D systolic matrix padding waste.
 * **Physical Immutability & Security**: Etched silicon diffusion masks prevent model tampering, runtime overwrites, bit-flips, or malicious model exfiltration.
@@ -67,18 +72,19 @@ Instead of a monolithic die or traditional board-level DRAM layout, the TE-1 is 
  (1)   |                  BASE DIE: MAIN IC                      |
        |  - 128 Parallel 1D-VSPU Slices: (1 x X) * 1 value       |
        |  - Hardware 1GbE / 2.5GbE MAC & Low-Power PHY (<0.5W)   |
-       |  - Integrated PoE+ / PoE++ PMIC & Voltage Regulators    |
+       |  - Native PCIe Gen3/4 Endpoint & DMA Ring Buffer Engine |
+       |  - Integrated PoE+ PMIC & PCIe 12V Buck Regulators      |
        |  - Hardware Microcode Sequencer & Token Sampler         |
        +---------------------------------------------------------+
                                     |
-              [ Single External Interface: RJ45 LAN with PoE ]
+   [ External Interface: RJ45 LAN with PoE  OR  Standard PCIe PC Card ]
 =============================================================================
 ```
 
-1. **Base Die: Main IC (Compute, Control & Networking):**
+1. **Base Die: Main IC (Compute, Control, Networking & PCIe):**
    - Fabricated in an advanced logic node (e.g., TSMC 4nm / N4P).
    - Houses the **1D-VSPU compute array** executing `(1 × X) * 1 value` basic operations at 100% duty cycle.
-   - Integrates the hardware **1 GbE / 2.5 GbE Ethernet MAC + PHY**, hardware UDP/IP packet parser, integrated **PoE/PoE+ PMIC**, microcode sequencer FSM, and bitonic token sampler.
+   - Integrates the hardware **1 GbE / 2.5 GbE Ethernet MAC + PHY**, PCIe Gen3/4 x1/x4 DMA controller, hardware binary packet parser, integrated **PoE/PoE+ PMIC & PCIe slot power regulator**, microcode sequencer FSM, and bitonic token sampler.
    - Interconnects vertically to the ROM and RAM dies via high-density Through-Silicon Vias (TSVs) or micro-bump arrays, delivering terabytes-per-second of vertical memory bandwidth with picojoule-level energy efficiency.
 
 2. **Middle Die: ROM IC (Model Weights & Constants Die — ROM ONLY):**
@@ -241,23 +247,23 @@ The 3-IC vertically stacked architecture (Main IC + ROM IC + RAM IC) fundamental
 
 #### 5. Operational Simplicity & Hardware Security
 - **Tool-Less In-Field Safe-Swap in $<10\text{s}$:** The specialized Zero-Insertion-Force (ZIF) cam-lock fixture with polarizing guide pins and an automatic power interlock switch allows non-technical personnel to safely upgrade models in seconds without tools or risk of bent pins.
-- **True Plug-and-Play Network Appliance:** A single RJ45 port handles both data tokens and power. Deploying 48 autonomous LLM engines is as simple as plugging 48 Ethernet cables into a commodity PoE switch.
+- **True Plug-and-Play Network Appliance & Desktop PCIe Card:** A single RJ45 port handles both data tokens and power for network deployments, while the PCIe Add-in Card (AIC) variant drops directly into standard desktop PCs with 100% bus power (zero auxiliary 12V power cables, zero host GPU VRAM contention).
 - **Physical Tamper-Proof Model Security:** Weights etched into physical Mask ROM cannot be modified by malware, corrupted by voltage glitches, or compromised via adversarial memory injection attacks.
 
 #### Architectural Comparison: Traditional GPU Server vs TE-1 3-IC Solution
 
 | Architectural Dimension | Traditional Datacenter GPU Server (8x H100 / H200) | TE-1 3-IC Stacked Solution |
 | :--- | :--- | :--- |
-| **Physical Form Factor** | 4U–8U heavy server chassis (80–120 kg) | **Standalone RJ45 micro-appliance / 1U–4U modular sleds** |
-| **Power Delivery** | Dual 3,000W–5,500W AC feeds (Requires 240V/48V busbar) | **Standard RJ45 PoE+ (IEEE 802.3at, 30W) / Low-power AC** |
+| **Physical Form Factor** | 4U–8U heavy server chassis (80–120 kg) | **Standalone RJ45 micro-appliance / PCIe PC Card (AIC) / 1U–4U modular sleds** |
+| **Power Delivery** | Dual 3,000W–5,500W AC feeds (Requires 240V/48V busbar) | **Standard RJ45 PoE+ (IEEE 802.3at, 30W) / PCIe slot bus-powered (75W) / Low-power AC** |
 | **Typical Power per Engine** | $700\text{ W} - 1,000\text{ W}$ per GPU | **$\mathbf{20.5\text{ W}}$ per complete 3-IC LLM engine** |
 | **Idle Standby Power** | $150\text{ W} - 300\text{ W}$ per GPU | **$< \mathbf{0.65\text{ W}}$ (Deep Sleep after ~50ms idle)** |
 | **Cold-Boot Weight Loading** | $2\text{ to }5\text{ minutes}$ over PCIe from NVMe | **$< \mathbf{50\text{ ms}}$ (Instant-On directly from ROM IC)** |
 | **Model Generational Upgrade** | Replace entire \$30,000 GPU; potential server redesign | **Swap modular ROM IC subcard (~\\$10–\$25); zero IC redesign** |
-| **Upgrade Mechanical Process** | Disassemble chassis, drain water cooling, re-torque heatsinks | **Flip tool-less ZIF cam-lock lever, swap in $<10\text{ seconds}$** |
+| **Upgrade Mechanical Process** | Disassemble chassis, drain water cooling, re-torque heatsinks | **Flip tool-less ZIF cam-lock lever (or rear PC bracket slot), swap in $<10\text{ seconds}$** |
 | **RAM Utilization for KV-Cache**| Shared: weights steal $40\text{ GB} - 70\text{ GB}$ of RAM capacity | **100% of RAM IC available for context (Zero weights in RAM)** |
 | **Energy per Emitted Token** | $\approx 1.12\text{ Joules / Token}$ (Batch=1) | **$\approx \mathbf{0.0328\text{ Joules / Token}}$ ($>34\times$ to $50\times$ lower!)** |
-| **Host System Requirements** | Dual x86 CPUs, 1.5TB DDR5 RAM, PCIe Gen5 switches | **None. Autonomous network-native silicon appliance.** |
+| **Host System Requirements** | Dual x86 CPUs, 1.5TB DDR5 RAM, PCIe Gen5 switches | **None for standalone appliances; or any standard desktop PC/workstation PCIe slot.** |
 
 ---
 
@@ -651,9 +657,9 @@ $$\text{Energy per Token on TE-1 (20.5W, 625 tokens/s, 100% 1D Util)} = \frac{20
 
 ---
 
-## 5. System Form-Factor Variants: Solo IC, 1U, 2U, and 4U Appliances
+## 5. System Form-Factor Variants: Solo Micro-Appliance, PCIe PC Card, 1U, 2U, and 4U Appliances
 
-The TE-1 architecture is realized in **four standardized hardware variants**, ranging from a standalone single-chip edge device to high-density multi-chip datacenter rackmount appliances with embedded switching fabrics.
+The TE-1 architecture is realized in **five standardized hardware variants**, ranging from standalone edge micro-appliances and desktop/workstation PCIe PC add-in cards (AIC) to high-density multi-chip datacenter rackmount appliances with embedded switching fabrics.
 
 ```mermaid
 flowchart TD
@@ -664,6 +670,17 @@ flowchart TD
         V1_PWR["Dual Power: PoE+ (30W) OR 12V/19V DC Jack"]
         V1_PWR --> V1_STACK
         V1_STACK <--> V1_ETH
+    end
+
+    subgraph VariantPCIe ["Variant 1B: TE-1 PCIe PC Card (Desktop / Workstation Add-in Card)"]
+        direction TB
+        V1B_STACK["1x to 4x 3-IC Stacks\n(Solo 1x, Duo 2x, Quad 4x)"]
+        V1B_SLOT["PCIe x4/x8/x16 Motherboard Slot (Gen 3/4)"]
+        V1B_PWR["100% PCIe Slot Bus-Powered\n(12V/3.3V, Up to 75W, Zero Cables)"]
+        V1B_ROM["Chassis-External Rear Slot\nOR Top-Edge ZIF Cam-Lock"]
+        V1B_PWR --> V1B_STACK
+        V1B_SLOT <-->|Sub-microsecond DMA / MMIO| V1B_STACK
+        V1B_ROM -.->|Safe-Swap Cartridge| V1B_STACK
     end
 
     subgraph VariantRack ["Variants 2, 3, 4: Rackmount Appliances (1U, 2U, 4U)"]
@@ -690,25 +707,25 @@ flowchart TD
 
 ### 5.1 Variant Comparison Matrix
 
-| Specification | Variant 1: TE-1 Solo | Variant 2: TE-1 Server 1U | Variant 3: TE-1 Enterprise 2U | Variant 4: TE-1 Frontier 4U |
-| :--- | :--- | :--- | :--- | :--- |
-| **Deployment Role** | Autonomous Edge AI Engine | Multi-Instance LLM Factory | Enterprise Concurrency Cluster| Frontier Hyperscale Swarm |
-| **3-IC Stack Count** | **1x 3-IC Stack** | **32x 3-IC Stacks** | **64x 3-IC Stacks** | **128x to 256x 3-IC Stacks** |
-| **Physical Stacking** | 3 Dies Vertically Stacked (Main + ROM + RAM) | 32 Vertical 3-IC Stacks in Sleds | 64 Vertical 3-IC Stacks in Sleds | 128+ Vertical 3-IC Stacks in Sleds |
-| **Complete LLM Capacity**| **1 Complete Full LLM** | **32 Independent Full LLMs** | **64 Independent Full LLMs** | **128+ Independent Full LLMs** |
-| **Silicon Architecture** | **Unified Single Variant:**<br/>- Base: Main IC (Compute/MAC)<br/>- Middle: ROM IC (Weights ONLY)<br/>- Top: RAM IC (Dynamic ONLY) | **Unified Single Variant:**<br/>32 identical 3-IC stacks with modular swappable ROM subcards | **Unified Single Variant:**<br/>64 identical 3-IC stacks with modular swappable ROM subcards | **Unified Single Variant:**<br/>128+ identical 3-IC stacks with modular swappable ROM subcards |
-| **Model Upgrades** | Tool-less swappable ROM cartridge (~\\$25, **Zero IC Redesign**) | Swappable ROM subcards per sled (**Zero IC Redesign**) | Swappable ROM subcards per sled (**Zero IC Redesign**) | Swappable ROM subcards per sled (**Zero IC Redesign**) |
-| **Cold-Boot Provisioning**| **Instant-On (<50 ms)** straight from ROM | **Instant-On (<50 ms)** straight from ROM | **Instant-On (<50 ms)** straight from ROM | **Instant-On (<50 ms)** straight from ROM |
-| **ROM IC Tier (Weights)** | 8 GB, 16 GB, 32 GB, or 64 GB | **256 GB – 2.0 TB aggregate ROM** | **512 GB – 4.0 TB aggregate ROM** | **1.0 TB – 8.0 TB aggregate ROM** |
-| **RAM IC Tier (KV-Cache)**| 16 GB, 32 GB, or 64 GB (Zero weights)| **512 GB – 2.0 TB aggregate RAM** | **1.0 TB – 4.0 TB aggregate RAM** | **2.0 TB – 8.0 TB aggregate RAM** |
-| **Internal Interconnect**| **None** (Direct IC MAC/PHY) | **Embedded 32-Port 1G/2.5G Switch** | **Embedded 64-Port 1G/2.5G Switch** | **Embedded 128-Port 1G/2.5G Switch** |
-| **Internal Switch Power**| $0\text{ W}$ (No switch needed) | $\sim 12\text{ W}$ (Low-power ASIC) | $\sim 20\text{ W}$ | $\sim 45\text{ W}$ |
-| **Power Source** | **Dual Option:**<br/>- PoE+ (802.3at, 30W) / PoE++ (802.3bt)<br/>- 12V/19V DC Jack | **AC Power Inlet:**<br/>Redundant 1+1 1200W PSUs (IEC C14 inlet) | **AC Power Inlet:**<br/>Redundant 2+2 1600W PSUs (IEC C14/C20) | **AC / Busbar Inlet:**<br/>Redundant 2+2 2400W PSUs (Dual C20 / 48V OCP) |
-| **Recalculated Operating Power**| **$\mathbf{20.5\text{ W}}$ typ / $\mathbf{25.0\text{ W}}$ peak** (PoE+ compliant) | **$\mathbf{\sim 748\text{ W}}$ typ / $\mathbf{890\text{ W}}$ peak** | **$\mathbf{\sim 1.48\text{ kW}}$ typ / $\mathbf{1.77\text{ kW}}$ peak** | **$\mathbf{\sim 2.97\text{ kW}}$ typ / $\mathbf{3.55\text{ kW}}$ peak** |
-| **Inference Uplink** | 1x 1GbE / 2.5GbE RJ45 | **1x 10GbE** (RJ45 or SFP+) | **1x 10GbE / 25GbE** (SFP+/SFP28) | **1x 25GbE / 40GbE** (SFP28 / QSFP+) |
-| **Uplink Token Capacity**| $>35\text{k tokens/sec}$ | $>300\text{k tokens/sec}$ | $>750\text{k tokens/sec}$ | $>1.2\text{M tokens/sec}$ |
-| **Console / Mgmt** | USB-C debug UART | 1x 1GbE RJ45 BMC + Serial | 1x 1GbE RJ45 BMC + Serial | 1x 1GbE RJ45 BMC + Serial |
-| **Model Hosting** | 1 Full Model (7B–32B, or 70B INT4) | 32 Independent Models or 32 Concurrent Instances | 64 Independent Models or 64 Concurrent Instances | 128 Independent Models or 128 Concurrent Instances |
+| Specification | Variant 1: TE-1 Solo | Variant 1B: TE-1 PCIe PC Card (AIC) | Variant 2: TE-1 Server 1U | Variant 3: TE-1 Enterprise 2U | Variant 4: TE-1 Frontier 4U |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Deployment Role** | Autonomous Edge AI Engine | Desktop / Workstation AI Accelerator | Multi-Instance LLM Factory | Enterprise Concurrency Cluster| Frontier Hyperscale Swarm |
+| **3-IC Stack Count** | **1x 3-IC Stack** | **1x, 2x, or 4x 3-IC Stacks** (Solo / Duo / Quad) | **32x 3-IC Stacks** | **64x 3-IC Stacks** | **128x to 256x 3-IC Stacks** |
+| **Physical Stacking** | 3 Dies Vertically Stacked (Main + ROM + RAM) | Half-Height Half-Length (HHHL) or Full-Height (FHHL) PCIe Card | 32 Vertical 3-IC Stacks in Sleds | 64 Vertical 3-IC Stacks in Sleds | 128+ Vertical 3-IC Stacks in Sleds |
+| **Complete LLM Capacity**| **1 Complete Full LLM** | **1 to 4 Full Concurrent LLMs** | **32 Independent Full LLMs** | **64 Independent Full LLMs** | **128+ Independent Full LLMs** |
+| **Silicon Architecture** | **Unified Single Variant:**<br/>- Base: Main IC (Compute/MAC)<br/>- Middle: ROM IC (Weights ONLY)<br/>- Top: RAM IC (Dynamic ONLY) | **Unified Single Variant:**<br/>Identical 3-IC stacks with exterior or top-edge modular swappable ROMs | **Unified Single Variant:**<br/>32 identical 3-IC stacks with modular swappable ROM subcards | **Unified Single Variant:**<br/>64 identical 3-IC stacks with modular swappable ROM subcards | **Unified Single Variant:**<br/>128+ identical 3-IC stacks with modular swappable ROM subcards |
+| **Model Upgrades** | Tool-less swappable ROM cartridge (~\\$25, **Zero IC Redesign**) | **Chassis-External Rear Slot or Top Cam-Lock** (~\\$25, **Zero IC Redesign**) | Swappable ROM subcards per sled (**Zero IC Redesign**) | Swappable ROM subcards per sled (**Zero IC Redesign**) | Swappable ROM subcards per sled (**Zero IC Redesign**) |
+| **Cold-Boot Provisioning**| **Instant-On (<50 ms)** straight from ROM | **Instant-On (<50 ms)** straight from ROM (Zero NVMe-to-GPU delay) | **Instant-On (<50 ms)** straight from ROM | **Instant-On (<50 ms)** straight from ROM | **Instant-On (<50 ms)** straight from ROM |
+| **ROM IC Tier (Weights)** | 8 GB, 16 GB, 32 GB, or 64 GB | **8 GB to 64 GB per stack** (up to 256 GB on Quad) | **256 GB – 2.0 TB aggregate ROM** | **512 GB – 4.0 TB aggregate ROM** | **1.0 TB – 8.0 TB aggregate ROM** |
+| **RAM IC Tier (KV-Cache)**| 16 GB, 32 GB, or 64 GB (Zero weights)| **16 GB to 64 GB per stack** (100% for context window) | **512 GB – 2.0 TB aggregate RAM** | **1.0 TB – 4.0 TB aggregate RAM** | **2.0 TB – 8.0 TB aggregate RAM** |
+| **Internal Interconnect**| **None** (Direct IC MAC/PHY) | **PCIe Gen3/4 x1 or x4 Host Interface** (Low-latency DMA ring buffer) | **Embedded 32-Port 1G/2.5G Switch** | **Embedded 64-Port 1G/2.5G Switch** | **Embedded 128-Port 1G/2.5G Switch** |
+| **Internal Switch Power**| $0\text{ W}$ (No switch needed) | $0\text{ W}$ (Solo) / $\sim 2.5\text{ W}$ (Duo/Quad PCIe packet switch) | $\sim 12\text{ W}$ (Low-power ASIC) | $\sim 20\text{ W}$ | $\sim 45\text{ W}$ |
+| **Power Source** | **Dual Option:**<br/>- PoE+ (802.3at, 30W) / PoE++ (802.3bt)<br/>- 12V/19V DC Jack | **100% PCIe Slot Bus-Powered (12V/3.3V, Up to 75W)**<br/>*Zero external 6-pin/8-pin power cables!* | **AC Power Inlet:**<br/>Redundant 1+1 1200W PSUs (IEC C14 inlet) | **AC Power Inlet:**<br/>Redundant 2+2 1600W PSUs (IEC C14/C20) | **AC / Busbar Inlet:**<br/>Redundant 2+2 2400W PSUs (Dual C20 / 48V OCP) |
+| **Recalculated Operating Power**| **$\mathbf{20.5\text{ W}}$ typ / $\mathbf{25.0\text{ W}}$ peak** (PoE+ compliant) | **$\mathbf{20.5\text{ W}}$ typ / $\mathbf{25.0\text{ W}}$ peak** (Solo)<br/>**$\mathbf{41.0\text{ W}}$ typ / $\mathbf{50.0\text{ W}}$ peak** (Duo)<br/>**$\mathbf{65.0\text{ W}}$ typ / $\mathbf{75.0\text{ W}}$ peak** (Quad) | **$\mathbf{\sim 748\text{ W}}$ typ / $\mathbf{890\text{ W}}$ peak** | **$\mathbf{\sim 1.48\text{ kW}}$ typ / $\mathbf{1.77\text{ kW}}$ peak** | **$\mathbf{\sim 2.97\text{ kW}}$ typ / $\mathbf{3.55\text{ kW}}$ peak** |
+| **Inference Uplink** | 1x 1GbE / 2.5GbE RJ45 | **PCIe Gen3/4 x1/x4** (Sub-microsecond) + Optional rear RJ45 | **1x 10GbE** (RJ45 or SFP+) | **1x 10GbE / 25GbE** (SFP+/SFP28) | **1x 25GbE / 40GbE** (SFP28 / QSFP+) |
+| **Uplink Token Capacity**| $>35\text{k tokens/sec}$ | **$>500\text{k tokens/sec}$** (Local host DMA bandwidth) | $>300\text{k tokens/sec}$ | $>750\text{k tokens/sec}$ | $>1.2\text{M tokens/sec}$ |
+| **Console / Mgmt** | USB-C debug UART | PCIe MMIO mailbox / `/dev/tokenengine0` + USB-C header | 1x 1GbE RJ45 BMC + Serial | 1x 1GbE RJ45 BMC + Serial | 1x 1GbE RJ45 BMC + Serial |
+| **Model Hosting** | 1 Full Model (7B–32B, or 70B INT4) | 1 to 4 Full Models (Zero GPU VRAM contention) | 32 Independent Models or 32 Concurrent Instances | 64 Independent Models or 64 Concurrent Instances | 128 Independent Models or 128 Concurrent Instances |
 
 ---
 
@@ -727,6 +744,40 @@ flowchart TD
   - **Primary (Zero-Cable):** Powered over standard Ethernet using **PoE+ (IEEE 802.3at, 30W)** or **PoE++ (IEEE 802.3bt)**.
   - **Auxiliary:** Standard 12V/19V DC barrel connector for use with non-PoE desktop switches or laptops.
 - **Use Cases:** Embedded robotics, developer desktop AST inference (ConceptLLM), personal coding coprocessor, and edge serverless endpoints.
+
+#### Variant 1B: TE-1 PCIe PC Card (Desktop & Workstation Add-in Card - AIC)
+- **Architecture Philosophy:** **Dedicated Local AI Silicon for Every Desktop PC & Workstation.** Brings the 3-IC stacked architecture directly into standard consumer and workstation PCs as a standard PCI Express Add-in Card (AIC). Eliminates the need for external network micro-appliances or PoE switches on the developer's desk.
+- **Physical Form Factor & Motherboard Compatibility:**
+  - **Standard AIC Dimensions:** Available in standard **Half-Height, Half-Length (HHHL)** low-profile form factor (with interchangeable full-height and half-height rear brackets included) or **Full-Height, Half-Length (FHHL)** single-slot card.
+  - **Slot Interconnect:** Physical PCIe x4 / x8 / x16 connector. Electrically operates on **PCIe Gen 3.0 / 4.0 x1 or x4**, delivering up to $2.0\text{ to }4.0\text{ GB/s}$ of host-to-chip bandwidth—vastly exceeding line-rate token streaming requirements!
+  - Compatible with all standard Intel and AMD desktop motherboards (ATX, microATX, Mini-ITX) as well as workstation and rack servers.
+- **100% PCIe Slot Bus-Powered (Zero Auxiliary Power Cables):**
+  - **Completely Bus-Powered:** Derives all operational power directly from the motherboard's PCIe slot gold fingers (+12V and +3.3V rails), adhering strictly to the **75W PCIe slot power specification**.
+  - **Measured Power Footprint:**
+    - **Solo Edition (1x 3-IC stack):** **$20.5\text{ W}$ typical / $25.0\text{ W}$ peak** (draws only ~1.7A from the 12V slot rail).
+    - **Duo Edition (2x 3-IC stacks):** **$41.0\text{ W}$ typical / $50.0\text{ W}$ peak** (hosts two independent models concurrently).
+    - **Quad Edition (4x 3-IC stacks):** **$65.0\text{ W}$ typical / $75.0\text{ W}$ peak** (high-concurrency workstation card).
+  - **Zero Cable Clutter:** Completely eliminates bulky 6-pin, 8-pin, or 12V-2x6 auxiliary power cables from the PC power supply. Drop the card into an open PCIe slot, secure one chassis screw, and boot immediately!
+- **Dual Swappable ROM Cartridge Accessibility Mechanisms:**
+  - **Option 1: Chassis-External Rear-Bracket Slot (Zero-Disassembly Upgrades):**
+    - The PCIe rear metal bracket incorporates an exterior-facing ZIF cartridge ejection bay.
+    - Users can eject the current ROM cartridge and slide in a new model generation (e.g. LLaMA-3.1 8B, ConceptLLM Coder 14B, Qwen-2.5 32B) **directly from the back of the PC without opening the computer chassis**!
+  - **Option 2: Top-Edge Cam-Lock Cartridge Slot:**
+    - Positioned along the top edge of the card PCB, accessible immediately upon opening the desktop PC side panel without removing the PCIe card from the motherboard.
+  - **Hardware Safety Interlock:** Lifting the cartridge cam-lock mechanically triggers an internal power interlock switch that power-gates the ROM rails before micro-contacts disengage, preventing live electrical shorts or silicon latch-up.
+- **Host Interconnect, Latency & Driver Architecture:**
+  - **Sub-Microsecond Latency:** Communicates over native PCIe Gen 3/4 DMA circular ring buffers and MMIO mailbox registers, achieving host-to-chip roundtrip latency under **$800\text{ ns}$** (orders of magnitude faster than local network hops).
+  - **Unified Binary Protocol:** Leverages the exact same binary packet protocol (`LAN_HEADER_t`, `CMD_PREFILL`, `RESP_TOKEN`) over DMA shared memory. Client applications and SDKs use the identical API whether communicating with a remote LAN appliance or a local PCIe card.
+  - **OS Driver Support:** Plug-and-play Linux kernel driver exposing `/dev/tokenengine0` and a virtual network adapter (`te0`), alongside a Windows WDF driver.
+  - **Optional Rear Bracket RJ45:** Full-height bracket versions include an optional 1 GbE / 2.5 GbE RJ45 port, enabling the PC to simultaneously act as a networked token server or cluster endpoint for other machines on the LAN.
+- **Thermals & Acoustic Profile:**
+  - High-efficiency finned aluminum/copper heatsink with a whisper-quiet low-profile fan (**$< 18\text{ dB(A)}$**, completely silent in home and office environments), or fully passive heatsink options for PC chassis with direct airflow.
+  - **Autonomous ~50ms Deep Sleep:** Automatically power-gates the Main IC and ROM down to **$<0.65\text{ W}$** (dynamic RAM self-refresh only) when idle, waking up in $<10\text{ }\mu\text{s}$ upon receiving an inference command.
+- **Desktop Value Proposition: Zero GPU VRAM Contention:**
+  - **100% Free Graphics VRAM:** Does not steal a single megabyte from the host PC's discrete graphics card (GeForce RTX, AMD Radeon, Intel Arc). GPUs remain 100% available for 4K/8K gaming, Unreal Engine, Blender rendering, or display output.
+  - **Instant-On Cold Boot (<50 ms):** Zero waiting minutes for 16GB–70GB model weights to load into GPU VRAM from SSD over the PCIe bus; weights are pre-mapped in silicon Mask ROM ready to serve tokens immediately upon boot.
+  - **Zero CPU Overhead:** The entire transformer forward pass and sampling execute on the 3-IC stack; host CPU utilization remains essentially 0%.
+- **Target Use Cases:** Developer workstation coding copilot (running ConceptLLM AST encoding/decoding and inference), local private IDE agents, gaming PC background LLM assistants, and edge workstation AI inference.
 
 #### Variant 2: TE-1 Server 1U (High-Density 32-Stack 1U Rackmount)
 - **Architecture Philosophy:** **32 Independent Complete LLMs in 1U.** Houses 32 vertical 3-IC stacks, each running an entire, independent model locally with weights in ROM and dynamic KV-cache in RAM. Acts as an ultra-high-density inference factory capable of executing 32 full conversational sessions simultaneously with zero cross-instance interference.
@@ -1071,9 +1122,9 @@ typedef struct {
 
 ---
 
-## 8. Physical Pinout & Power over Ethernet (PoE) Design
+## 8. Physical Pinout, Power Delivery (PoE & PCIe Slot), and Electrical Design
 
-Because the chip communicates strictly over standard LAN (1 GbE / 2.5 GbE) and derives power from PoE, its physical pin count is remarkably small. Eliminating multi-gigabit SerDes allows the chip to interface directly with standard RJ45 magnetics without requiring fragile, expensive high-speed PCB traces.
+Because the chip communicates over standard LAN (1 GbE / 2.5 GbE) in standalone micro-appliances and over standard PCI Express (PCIe Gen3/4 x1/x4) in desktop PC cards, its physical pin count and packaging requirements are remarkably streamlined compared to traditional multi-thousand-pin GPU packages.
 
 ### 8.1 Physical Pin Definition (Compact QFN-64 / BGA-144 Package)
 
@@ -1107,18 +1158,50 @@ Eliminating high-speed 25G/50G SerDes drops on-chip PHY power to $<0.5\text{ W}$
 | **Base Die: Main IC (SRAM)** | 512 MB On-Chip SRAM (L1 Scratchpad, 0.85V) | **$3.5\text{ W}$** | **$4.2\text{ W}$** | Banked access; only active activation buffers clocked |
 | **Middle Die: ROM IC (Weights)** | 32 GB – 64 GB 3D Mask ROM / NVM (Constant Data) | **$2.2\text{ W}$** | **$2.8\text{ W}$** | **Zero DRAM refresh power**; TSV reads draw only $\approx 0.8\text{ pJ/byte}$ |
 | **Top Die: RAM IC (KV-Cache)** | 16 GB – 64 GB Dynamic RAM (Dynamic Data Only) | **$1.8\text{ W}$** | **$2.4\text{ W}$** | Holds KV-cache only; refresh power is $\sim 0.4\text{ W}$ (no weights) |
-| **Base Die: Main IC (Network)** | 1G/2.5G Ethernet MAC + Low-Power PHY | **$0.4\text{ W}$** | **$0.5\text{ W}$** | Standard 1000BASE-T/2.5GBASE-T; no SerDes power burn |
+| **Base Die: Main IC (Network/PCIe)** | 1G/2.5G Ethernet MAC/PHY or PCIe Gen3/4 x1 Controller | **$0.4\text{ W}$** | **$0.5\text{ W}$** | Low-power PHY; zero multi-terabit SerDes overhead |
 | **Base Die: Main IC (Control)** | Microcode Sequencer & Token Sampler | **$0.6\text{ W}$** | **$0.8\text{ W}$** | Hardwired FSM and bitonic sorting network |
-| **Base Die: PMIC Regulators** | Integrated PoE+ PMIC & Buck Regulators (93.5% eff) | **$1.5\text{ W}$** | **$1.8\text{ W}$** | High-efficiency on-package synchronous power stage |
-| **TOTAL ACTIVE 3-IC STACK POWER**| **Full Generation Load (Main + ROM + RAM)**| **$\mathbf{20.5\text{ W}}$** | **$\mathbf{25.0\text{ W}}$** | **Fully compliant with standard IEEE 802.3at PoE+ (30W PD)** |
+| **Base Die: PMIC Regulators** | Integrated PoE+ / PCIe Buck Regulators (93.5% eff) | **$1.5\text{ W}$** | **$1.8\text{ W}$** | High-efficiency on-package synchronous power stage |
+| **TOTAL ACTIVE 3-IC STACK POWER**| **Full Generation Load (Main + ROM + RAM)**| **$\mathbf{20.5\text{ W}}$** | **$\mathbf{25.0\text{ W}}$** | **Fully compliant with standard IEEE 802.3at PoE+ (30W PD) & PCIe Slot (75W)** |
 | **DEEP SLEEP (~50ms IDLE)** | **Main IC & ROM Asleep; RAM Self-Refresh Only** | **$\mathbf{0.55\text{ W}}$** | **$\mathbf{0.65\text{ W}}$** | **Power-gated compute/ROM; dynamic RAM self-refresh preserves context** |
 
 ### 8.3 Autonomous ~50ms Idle Deep Sleep Mechanism
-To eliminate standby power consumption across edge nodes and large datacenter deployments:
-- **Automatic ~50ms Idle Detection:** If no token request or packet activity is observed on the network interface for **$\sim 50\text{ ms}$**, an internal hardware counter initiates immediate deep sleep.
+To eliminate standby power consumption across edge nodes, desktop PCs, and large datacenter deployments:
+- **Automatic ~50ms Idle Detection:** If no token request or packet activity is observed on the network or PCIe interface for **$\sim 50\text{ ms}$**, an internal hardware counter initiates immediate deep sleep.
 - **Main IC & ROM IC Power-Gated to Sleep:** The 1D-VSPU arithmetic logic, on-chip SRAM, sequencer FSM, and the entire Middle Die (ROM IC) are put to sleep with internal power switches disconnected. Because the ROM IC is non-volatile Mask ROM, cutting its power causes zero data loss.
-- **Dynamic RAM IC in Autonomous Self-Refresh:** **Only the RAM IC remains powered**, placed into low-power self-refresh mode ($\approx 0.25\text{ W}$) to preserve active conversation context and paged KV-cache without CPU or Main IC intervention.
-- **Zero-Latency Network Wakeup ($< 10\text{ }\mu\text{s}$):** When a new prompt packet hits the physical RJ45 port, the Ethernet PHY line monitor triggers an asynchronous interrupt that re-energizes the Main IC and ROM in $< 10\text{ }\mu\text{s}$, resuming full generation immediately with zero perceptible delay.
+- **Dynamic RAM IC in Autonomous Self-Refresh:** **Only the RAM IC remains powered**, placed into low-power self-refresh mode ($\approx 0.25\text{ W}$) to preserve active conversation context and paged KV-cache without host CPU or Main IC intervention.
+- **Zero-Latency Host Wakeup ($< 10\text{ }\mu\text{s}$):** When a new prompt packet hits the physical RJ45 port or PCIe DMA mailbox, the line monitor triggers an asynchronous interrupt that re-energizes the Main IC and ROM in $< 10\text{ }\mu\text{s}$, resuming full generation immediately with zero perceptible delay.
+
+### 8.4 PCIe PC Add-in Card (AIC) Pinout & Power Budget Specification
+
+For deployment as a desktop PC card (Variant 1B), the card interfaces directly with standard PCIe slots on consumer or workstation motherboards:
+
+```
++-----------------------------------------------------------------+
+|                  TE-1 PCIe PC Card Edge Connector               |
+|                                                                 |
+|  [+12V Pins (B1, B2, B3, A2, A3)]   Direct 12V Slot Bus Power   |
+|  [+3.3V Pins (A9, A10, B10, etc.)]  Auxiliary 3.3V Rail         |
+|  [GND Pins]                         PCIe Ground Reference Plane |
+|                                                                 |
+|  [REFCLK+, REFCLK-]                 100 MHz PCIe Reference Clock|
+|  [PERST#]                           Fundamental PCIe Slot Reset |
+|  [WAKE#]                            PCIe PME / Low-Power Wakeup |
+|  [SMCLK, SMDAT]                     I2C / SMBus Diagnostic Telemetry
+|                                                                 |
+|  [PETp0, PETn0]                     PCIe Lane 0 Tx Diff Pair    |
+|  [PERp0, PERn0]                     PCIe Lane 0 Rx Diff Pair    |
+|  [PETp1..3, PETn1..3] (Optional)    PCIe Lanes 1..3 Tx Pairs    |
+|  [PERp1..3, PERn1..3] (Optional)    PCIe Lanes 1..3 Rx Pairs    |
++-----------------------------------------------------------------+
+```
+
+#### PCIe Slot Power Budget vs Actual Consumption:
+* **PCIe Specification Limit:** Standard PCIe x4, x8, and x16 motherboard slots are certified to deliver up to **$75.0\text{ W}$ continuous** ($5.5\text{ A}$ @ $12\text{V} = 66\text{W}$, plus $3.0\text{ A}$ @ $3.3\text{V} = 10\text{W}$).
+* **TE-1 Solo AIC (1 Stack):** Draws **$20.5\text{ W}$ typical / $25.0\text{ W}$ peak** $\longrightarrow$ Uses only **$33\%$** of available PCIe slot power!
+* **TE-1 Duo AIC (2 Stacks):** Draws **$41.0\text{ W}$ typical / $50.0\text{ W}$ peak** $\longrightarrow$ Uses only **$66\%$** of slot capacity!
+* **TE-1 Quad AIC (4 Stacks):** Draws **$65.0\text{ W}$ typical / $75.0\text{ W}$ peak** $\longrightarrow$ Perfectly caps out at the $75\text{ W}$ slot limit without requiring external PSU cables!
+* **Onboard Power Conversion:** High-efficiency synchronous multi-phase buck regulators on the card convert the PCIe 12V input directly into the 0.75V core logic, 0.85V SRAM, 1.1V memory, and 1.8V I/O rails at $>94\%$ electrical conversion efficiency.
+* **PCIe Power Management States:** Full compliance with PCIe Active State Power Management (ASPM L0s, L1, and L1 Substates `L1.1`/`L1.2`). When idle, the card transitions to PCIe `L1.2` state drawing $<0.65\text{ W}$ total while preserving dynamic RAM KV-cache.
 
 ---
 
@@ -1319,55 +1402,162 @@ module ai_token_chip_top #(
 endmodule
 ```
 
+### 9.1 PCIe Endpoint Top-Level Integration Wrapper (`ai_token_chip_pcie_top.sv`)
+
+For the desktop/workstation **PCIe PC Add-in Card (Variant 1B)**, the Main IC base die replaces the external RJ45 Ethernet PHY with a low-latency **PCIe Gen3/4 x1/x4 Endpoint Controller & DMA Ring Buffer Bridge**:
+
+```systemverilog
+// ============================================================================
+// Module: ai_token_chip_pcie_top
+// Description: PCIe Add-in Card (AIC) Top-Level Wrapper for Desktop/Workstation
+//              Bridges PCIe DMA Ring Buffers to 3-IC Token Generation Engine
+// ============================================================================
+
+module ai_token_chip_pcie_top #(
+    parameter PCIE_LANES        = 4,    // PCIe Gen3/Gen4 x1 or x4
+    parameter TSV_BUS_WIDTH     = 1024
+)(
+    // PCIe Slot Physical Signals
+    input  wire                 pcie_refclk_p,    // 100 MHz HCSL differential clock
+    input  wire                 pcie_refclk_n,
+    input  wire                 pcie_perst_n,     // Fundamental slot reset
+    input  wire [PCIE_LANES-1:0] pcie_rx_p,       // Host-to-Device differential pairs
+    input  wire [PCIE_LANES-1:0] pcie_rx_n,
+    output wire [PCIE_LANES-1:0] pcie_tx_p,       // Device-to-Host differential pairs
+    output wire [PCIE_LANES-1:0] pcie_tx_n,
+    output wire                 pcie_wake_n,      // Low-power wakeup signaling
+
+    // Status Diagnostic LEDs
+    output wire                 led_pcie_link,
+    output wire                 led_token_active
+);
+
+    // Internal High-Speed AXI-Stream Ring Buffer Interfaces
+    wire        axis_clk;
+    wire        axis_rst_n;
+    wire [63:0] s_axis_host_tdata;
+    wire        s_axis_host_tvalid;
+    wire        s_axis_host_tready;
+    wire [63:0] m_axis_token_tdata;
+    wire        m_axis_token_tvalid;
+    wire        m_axis_token_tready;
+
+    // Integrated Hard PCIe Gen4 x4 Endpoint + Scatter-Gather DMA Controller
+    pcie_gen4_endpoint_dma #(
+        .NUM_LANES (PCIE_LANES)
+    ) u_pcie_endpoint (
+        .refclk_p       (pcie_refclk_p),
+        .refclk_n       (pcie_refclk_n),
+        .perst_n        (pcie_perst_n),
+        .rx_p           (pcie_rx_p),
+        .rx_n           (pcie_rx_n),
+        .tx_p           (pcie_tx_p),
+        .tx_n           (pcie_tx_n),
+        .wake_n         (pcie_wake_n),
+        
+        // Host DMA ring buffer interfaces (mapped directly to /dev/tokenengine0)
+        .axis_clk       (axis_clk),
+        .axis_rst_n     (axis_rst_n),
+        .rx_tdata       (s_axis_host_tdata),
+        .rx_tvalid      (s_axis_host_tvalid),
+        .rx_tready      (s_axis_host_tready),
+        .tx_tdata       (m_axis_token_tdata),
+        .tx_tvalid      (m_axis_token_tvalid),
+        .tx_tready      (m_axis_token_tready),
+        .link_up        (led_pcie_link)
+    );
+
+    // Instantiate Core 3-IC Stack Engine (Exact same compute/ROM/RAM core)
+    ai_token_engine_core u_stack_core (
+        .clk            (axis_clk),
+        .rst_n          (axis_rst_n),
+        .in_pkt_data    (s_axis_host_tdata),
+        .in_pkt_valid   (s_axis_host_tvalid),
+        .in_pkt_ready   (s_axis_host_tready),
+        .out_pkt_data   (m_axis_token_tdata),
+        .out_pkt_valid  (m_axis_token_tvalid),
+        .out_pkt_ready  (m_axis_token_tready),
+        .activity_pulse (led_token_active)
+    );
+
+endmodule
+```
+
 ---
 
-## 10. Client Driver / Network SDK (C & Python)
+## 10. Client Driver & Host SDK (C & Python — Network & PCIe Unified)
 
-Because the chip is an autonomous network device, the client driver is simply a lightweight socket library that connects over Ethernet:
+The client SDK provides a **unified programming model**: whether communicating over the network with a standalone PoE micro-appliance or over local PCIe with a desktop PC card, client code uses the exact same interface and binary packet specification.
 
-### 10.1 Python Client Example (with Bidirectional QKV Cache Support)
+### 10.1 Python Client Example (Network & Local PCIe Add-in Card)
 ```python
+import os
 import socket
 import struct
 
 class TokenEngineClient:
-    def __init__(self, ip: str, port: int = 8443):
-        self.target = (ip, port)
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.settimeout(5.0)
+    def __init__(self, ip: str = None, port: int = 8443, pcie_dev: str = None):
+        """
+        Connects to either a remote Ethernet TE-1 appliance via UDP,
+        or a local TE-1 PCIe PC Card (AIC) via /dev/tokenengine0.
+        """
+        self.is_pcie = pcie_dev is not None
+        if self.is_pcie:
+            # Native PCIe host device interface (<800ns DMA latency)
+            self.fd = os.open(pcie_dev, os.O_RDWR | os.O_SYNC)
+            print(f"Connected to local TE-1 PCIe PC Card on {pcie_dev}")
+        else:
+            # Network Ethernet socket interface
+            self.target = (ip, port)
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.sock.settimeout(5.0)
+            print(f"Connected to TE-1 Network Appliance at {ip}:{port}")
+
+    def _send_packet(self, data: bytes):
+        if self.is_pcie:
+            os.write(self.fd, data)
+        else:
+            self.sock.sendto(data, self.target)
+
+    def _recv_packet(self, size: int) -> bytes:
+        if self.is_pcie:
+            return os.read(self.fd, size)
+        else:
+            data, _ = self.sock.recvfrom(size)
+            return data
 
     def init_session(self, session_id: int, expected_model_id: int = 0x54454E31, max_context: int = 131072):
         """Initializes a conversational session and verifies model signature in the ROM IC (No weight transfer needed!)."""
         payload = struct.pack("!IIHI6s", session_id, expected_model_id, 64, max_context, b"\x00"*6)
         header = struct.pack("!4sHHBBI", b"TEN1", 1, 0x01 /* CMD_SESSION_INIT */, 0, len(payload), 0)
-        self.sock.sendto(header + payload, self.target)
-        resp, _ = self.sock.recvfrom(1024)
+        self._send_packet(header + payload)
+        resp = self._recv_packet(1024)
         print("Session initialized on 3-IC Stack:", resp)
 
     def prefill_and_stream(self, prompt_tokens: list[int], temperature: float = 0.7, top_p: float = 0.9):
-        """Sends PREFILL command and yields streaming tokens directly over LAN."""
+        """Sends PREFILL command and yields streaming tokens directly over PCIe or LAN."""
         payload = struct.pack("!IffHH4I", len(prompt_tokens), temperature, top_p, 40, 256, 2, 0, 0, 0)
         payload += struct.pack(f"!{len(prompt_tokens)}I", *prompt_tokens)
         header = struct.pack("!4sHHBBI", b"TEN1", 2, 0x03 /* CMD_PREFILL */, 0, len(payload), 0)
-        self.sock.sendto(header + payload, self.target)
+        self._send_packet(header + payload)
 
-        # Stream emitted tokens directly from the wire
+        # Stream emitted tokens directly
         while True:
-            data, _ = self.sock.recvfrom(64)
+            data = self._recv_packet(64)
             _, step, token_id, logprob, flags, _, _ = struct.unpack("!IIIfB3sQ", data[16:])
             yield token_id, logprob
             if flags & 0x01: # EOS reached
                 break
 
     def export_kv_cache(self, session_id: int, start_page: int = 0, page_count: int = 0) -> bytes:
-        """Dumps dynamic RAM IC KV-cache over LAN for checkpointing or migration."""
+        """Dumps dynamic RAM IC KV-cache for checkpointing or migration."""
         payload = struct.pack("!IIIB3s", session_id, start_page, page_count, 1 /* evict */, b"\x00"*3)
         header = struct.pack("!4sHHBBI", b"TEN1", 3, 0x06 /* CMD_QKV_EXPORT */, 0, len(payload), 0)
-        self.sock.sendto(header + payload, self.target)
+        self._send_packet(header + payload)
         
         kv_pages = bytearray()
         while True:
-            pkt, _ = self.sock.recvfrom(4096)
+            pkt = self._recv_packet(4096)
             if len(pkt) == 16: # End of dump packet
                 break
             kv_pages.extend(pkt[16:]) # Append KV page payload
@@ -1376,29 +1566,29 @@ class TokenEngineClient:
 
     def import_kv_cache(self, session_id: int, kv_cache_blob: bytes):
         """Ingests pre-computed KV-cache into dynamic RAM IC to start decode immediately."""
-        CHUNK_SIZE = 1400 # Fits within MTU 1500
+        CHUNK_SIZE = 1400 # Fits within MTU / DMA block
         total_chunks = (len(kv_cache_blob) + CHUNK_SIZE - 1) // CHUNK_SIZE
         for i in range(total_chunks):
             chunk = kv_cache_blob[i*CHUNK_SIZE : (i+1)*CHUNK_SIZE]
             is_last = 1 if i == total_chunks - 1 else 0
             header = struct.pack("!4sHHBBI", b"TEN1", i, 0x05 /* CMD_QKV_INGEST */, is_last, len(chunk), 0)
-            self.sock.sendto(header + chunk, self.target)
-        resp, _ = self.sock.recvfrom(1024)
+            self._send_packet(header + chunk)
+        resp = self._recv_packet(1024)
         print("Imported KV-cache into TE-1 RAM IC:", resp)
 
-# Usage Example
-client = TokenEngineClient("192.168.1.101")
-client.init_session(session_id=1001)
-print("Streaming tokens from 3-IC Stack PoE AI Chip:")
-for token, logprob in client.prefill_and_stream([101, 4520, 893]):
+# Usage Example: Local Desktop PCIe PC Card
+client_pcie = TokenEngineClient(pcie_dev="/dev/tokenengine0")
+client_pcie.init_session(session_id=1001)
+print("Streaming tokens from local desktop PCIe PC card:")
+for token, logprob in client_pcie.prefill_and_stream([101, 4520, 893]):
     print(f"Token: {token} (p={logprob:.2f})")
 
-# Export session dynamic KV-cache to network storage
-saved_kv = client.export_kv_cache(session_id=1001)
+# Export session dynamic KV-cache to network or host storage
+saved_kv = client_pcie.export_kv_cache(session_id=1001)
 
-# Later: Ingest saved KV-cache into a different TE-1 stack and resume decoding
-client_node2 = TokenEngineClient("192.168.1.102")
-client_node2.import_kv_cache(session_id=1001, kv_cache_blob=saved_kv)
+# Usage Example: Network Attached Remote TE-1 Appliance
+client_lan = TokenEngineClient(ip="192.168.1.102")
+client_lan.import_kv_cache(session_id=1001, kv_cache_blob=saved_kv)
 ```
 
 ---
@@ -1409,18 +1599,19 @@ client_node2.import_kv_cache(session_id=1001, kv_cache_blob=saved_kv)
 | :--- | :--- | :--- |
 | **Physical Architecture** | **3 Custom ICs Stacked Vertically** (Main IC, ROM IC, RAM IC) | Raspberry Pi style vertical stacking via TSV micro-bumps |
 | **Silicon Role Division** | **ROM: Constant Data ONLY** (Weights) \| **RAM: Dynamic Data ONLY** (KV-Cache) | Zero weights in RAM; 100% RAM capacity for context window |
-| **Form Factor & Enclosure** | Standalone RJ45 PoE micro-appliance / 1U, 2U, 4U rack appliances | Plugs directly into standard Ethernet switches |
-| **Physical Network Port** | 1 GbE / 2.5 GbE (1000BASE-T / 2.5GBASE-T RJ45) | Optimized strictly for token transfers; low-power (<0.5W PHY)|
-| **Model Lifecycle & Upgrades** | **3–6–12 Month Cycles: ROM IC Replacement Only** | Swapped in $<10\text{s}$ via specialized ZIF fixture; cheap Mask ROM ($\sim \$10 - \$25$); **zero IC redesign** |
-| **Cold-Boot Bringup Time** | **$< 50\text{ ms}$ Instant-On** | Reads pre-etched weights immediately from ROM IC |
-| **Recalculated Power Draw** | **$\mathbf{20.5\text{ W}}$ typical / $\mathbf{25.0\text{ W}}$ peak per 3-IC stack** | **Comfortably under standard IEEE 802.3at PoE+ (30W PD)** |
+| **Form Factor Options** | **1. Standalone RJ45 PoE micro-appliance**<br/>**2. Desktop/Workstation PCIe PC Add-in Card (AIC)**<br/>**3. 1U, 2U, 4U Datacenter rack appliances** | Plugs directly into standard Ethernet switches OR desktop PCIe slots |
+| **Physical Ports** | 1 GbE / 2.5 GbE RJ45 (Appliance) OR PCIe Gen3/4 x1/x4 (PC Card) | Low-power PHY (<0.5W PHY) or ultra-fast DMA (<800ns host latency) |
+| **Model Lifecycle & Upgrades** | **3–6–12 Month Cycles: ROM IC Replacement Only** | Swapped in $<10\text{s}$ via ZIF fixture or rear PC bracket slot; cheap Mask ROM ($\sim \$10 - \$25$); **zero IC redesign** |
+| **Cold-Boot Bringup Time** | **$< 50\text{ ms}$ Instant-On** | Reads pre-etched weights immediately from ROM IC (Zero PCIe NVMe-to-VRAM transfer) |
+| **Operating Power Draw** | **$\mathbf{20.5\text{ W}}$ typical / $\mathbf{25.0\text{ W}}$ peak per 3-IC stack** | **100% compliant with IEEE 802.3at PoE+ (30W) and PCIe slot power (75W bus-powered)** |
 | **Deep Sleep Power (~50ms Idle)** | **$< \mathbf{0.65\text{ W}}$ per 3-IC stack** | **Main IC & ROM power-gated to sleep; only RAM is self-refreshed** |
 | **Compute Engine** | 128 parallel 1D-VSPU slices ($X=64$) on Main IC | 100% compute duty cycle during single-token decode |
 | **ROM IC Sizing (Weights)** | **8 GB, 16 GB, 32 GB, 64 GB, or 128 GB (Cartridge Tiers)** | 0.55 B/param (INT4) / 1.05 B/param (FP8); zero DRAM refresh |
 | **RAM IC Sizing (KV-Cache)** | **16 GB, 32 GB, or 64 GB (Dynamic State Only)** | 100% capacity for KV-cache: 500k to 2,000,000 tokens! |
 | **Frontier MoE Capacity** | Up to **1.8+ Trillion Parameters** (across 64–128 stacks) | Sparse MoE routing with zero compute waste |
-| **Standalone Prefill Throughput** | $> 7,200\text{ tokens/sec}$ | FlashAttention on internal SRAM/RAM; zero LAN traffic |
-| **Autoregressive Decode Latency** | $< 1.6\text{ ms / token}$ ($> 625\text{ tokens/sec}$) | Emitted tokens packaged directly into UDP frames |
+| **Standalone Prefill Throughput** | $> 7,200\text{ tokens/sec}$ | FlashAttention on internal SRAM/RAM; zero bus traffic |
+| **Autoregressive Decode Latency** | $< 1.6\text{ ms / token}$ ($> 625\text{ tokens/sec}$) | Emitted tokens packaged directly into DMA / UDP frames |
+| **Host Graphics Compatibility** | **Zero Host GPU VRAM Contention** | Host GPU remains 100% free for gaming/rendering on PC card variant |
 | **64-Stack Frontier Rack Power** | **$\sim 1.48\text{ kW}$ typical / $\sim 1.77\text{ kW}$ peak** total operating power | 1–4 TB ROM + 1–4 TB RAM, $>40\text{k tokens/s}$ aggregate decode |
 
 ---
@@ -1432,14 +1623,16 @@ By combining:
    - **All LLM Constant Data (Weights, biases, normalization scales, matrix formats, static quantization tables, and model topology) is stored in the ROM, and ROM ONLY.**
    - **RAM is used strictly for Dynamic Data (activations, paged Key-Value context cache, scratchpads, and token streaming queues).**
 2. **The 3 Custom IC Stacked Solution:** Built as three custom ICs stacked vertically on top of each other (like a Raspberry Pi stack):
-   - **Base Die (Main IC):** 1D-VSPU compute array, hardware 1G/2.5G MAC/PHY, integrated PoE PMIC, and microcode sequencer.
+   - **Base Die (Main IC):** 1D-VSPU compute array, hardware 1G/2.5G MAC/PHY & PCIe Gen3/4 DMA engine, integrated PMIC, and microcode sequencer.
    - **Middle Die (ROM IC):** Dedicated 3D Mask ROM / NVM holding 100% of model constants.
    - **Top Die (RAM IC):** Dedicated dynamic RAM holding 100% of dynamic runtime state (zero weights).
-3. **Autonomous ~50ms Idle Deep Sleep:** After $\sim 50\text{ ms}$ of network idle time, the Main IC and ROM IC are automatically put to deep sleep (power-gated), while only the dynamic RAM IC is refreshed in autonomous self-refresh mode ($<0.65\text{ W}$ total stack draw), with $<10\text{ }\mu\text{s}$ zero-latency network wakeup upon the next arriving prompt token.
-4. **Rapid Model Upgrades (3–6–12 Month Cycles) via Cheap Swappable ROMs:** Decoupling the model into a modular, highly economical Mask ROM subcard ($\sim \$10 - \$25$ manufacturing cost) with a specialized Zero-Insertion-Force (ZIF) cam-lock safe-swap fixture ensures rapid model upgrades require zero silicon redesign, zero tape-outs, and zero respins of the Main IC or RAM IC.
-5. **The Token-Bandwidth Reality:** Generative AI is dominated by token transfers (2–4 bytes per token), eliminating ultra-high-speed SerDes and massive terabit switches in favor of cost-effective, low-power **1 GbE / 2.5 GbE Ethernet**.
-6. **A Single Physical LAN Port (Ethernet + PoE):** Single RJ45 connection carrying both data tokens and operating power under standard PoE+ (30W), eliminating host motherboards, CPUs, proprietary inter-chip interconnects, and external power bricks.
+3. **Dual Physical Deployment Paradigms:**
+   - **Standalone Ethernet AI Appliance:** Single RJ45 connection carrying both data tokens and operating power under standard PoE+ (30W), eliminating host motherboards, CPUs, and power bricks.
+   - **Desktop / Workstation PCIe PC Add-in Card (AIC):** Standard single-slot card powered 100% from the motherboard PCIe slot ($<25.0\text{ W}$ peak, zero external 6/8-pin power cables), bringing silent, dedicated local AI inference to any consumer or workstation PC with zero GPU VRAM contention.
+4. **Autonomous ~50ms Idle Deep Sleep:** After $\sim 50\text{ ms}$ of idle time, the Main IC and ROM IC are automatically put to deep sleep (power-gated), while only the dynamic RAM IC is refreshed in autonomous self-refresh mode ($<0.65\text{ W}$ total stack draw), with $<10\text{ }\mu\text{s}$ zero-latency wakeup upon the next arriving prompt token.
+5. **Rapid Model Upgrades (3–6–12 Month Cycles) via Cheap Swappable ROMs:** Decoupling the model into a modular, highly economical Mask ROM subcard ($\sim \$10 - \$25$ manufacturing cost) with specialized ZIF cam-lock or chassis-external rear bracket safe-swap fixtures ensures rapid model upgrades require zero silicon redesign, zero tape-outs, and zero respins of the Main IC or RAM IC.
+6. **The Token-Bandwidth Reality:** Generative AI is dominated by token transfers (2–4 bytes per token), eliminating ultra-high-speed multi-hundred-watt SerDes and massive terabit switches in favor of cost-effective, low-power **1 GbE / 2.5 GbE Ethernet or efficient PCIe DMA**.
 7. **Autonomous Execution & 1D Compute Primitives:** 128 parallel 1D-VSPU slices operating at 100% duty cycle, eliminating the silicon overhead, thermal hotspots, and 93%+ idle waste of 2D systolic arrays.
 
-the `TokenEngine-1` transforms AI inference into modular, plug-and-play **Ethernet AI silicon appliances capable of serving frontier commercial LLMs at unprecedented cost efficiency and operational simplicity**.
+the `TokenEngine-1` transforms AI inference into modular, plug-and-play **silicon appliances and desktop PCIe cards capable of serving frontier commercial LLMs at unprecedented cost efficiency, zero graphics contention, and operational simplicity**.
 

@@ -188,6 +188,8 @@ Because source code parsing and unparsing are handled deterministically by `tree
 | **Code Decoder (`AST + [SYM_k] -> Code`)** | Deterministic AST Unparser + Native Formatter | **< 2 ms per file** | **~10 MB CPU RAM (0 MB GPU)** |
 | **Prompt/Docstring Mapper** | Rule-based NLP (`spaCy`/UD) or tiny 0.5B Codec | **< 15 ms per prompt** | **~0.1 GB – 0.5 GB RAM** |
 
+> **Hardware Acceleration Option:** For desktop developer machines and edge workstations, local ConceptLLM inference can be accelerated via the **`TokenEngine-1` (TE-1) PCIe PC Add-in Card (AIC)**—a 100% bus-powered (75W), 3D-stacked silicon accelerator featuring swappable Mask ROM weights and zero host GPU VRAM contention. See [AI_CHIP_DESIGN.md](file:///home/boris/projects/ConceptLLM/AI_CHIP_DESIGN.md) for complete specifications.
+
 ---
 
 ### 5.3 Mathematical Breakdown: Where the Gains Come From
