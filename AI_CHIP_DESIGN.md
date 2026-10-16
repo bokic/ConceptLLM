@@ -116,11 +116,11 @@ Under traditional GPU clusters, these updates often render hardware obsolete or 
 
 1. **Only the ROM IC is Replaced:**
    - The **Main IC** (compute logic, 1G/2.5G network engine, sequencer, PMIC) and the **RAM IC** are 100% permanent, model-agnostic silicon.
-   - **Zero silicon redesign, zero mask respins, and zero foundry tape-out costs** ($>\$20\text{M}$ saved per generation).
+   - **Zero silicon redesign, zero mask respins, and zero foundry tape-out costs** (> \$20M saved per generation).
 2. **Ultra-Low-Cost ROM Manufacturing:**
    - The ROM IC is fabricated as high-density **3D Mask ROM / Non-Volatile Memory (NVM)**.
    - Unlike high-speed logic or high-bandwidth DRAM (which require hundreds of complex lithography mask steps and capacitive refresh cells), Mask ROM is programmed using simple via/metal layer mask etching on mature, high-yield wafer lines.
-   - **Manufacturing Cost at Scale:** $\mathbf{\sim \$10 - \$25\text{ per ROM IC}}$ (versus \$1,500 - \$3,500 for high-speed HBM stacks or \$30,000 for GPU accelerators!).
+   - **Manufacturing Cost at Scale:** **~ \$10 – \$25 per ROM IC** (versus \$1,500 – \$3,500 for high-speed HBM stacks or \$30,000 for GPU accelerators!).
 3. **Specialized Mechanical Safe-Swap Fixture:**
    - The ROM IC is packaged in a standardized **Precision Shielded Cartridge / Subcard**.
    - The vertical 3-IC stack features a **Specialized Zero-Insertion-Force (ZIF) Cam-Lock Fixture** with:
@@ -158,7 +158,7 @@ $$\text{ROM Footprint} = N_{\text{params}} \times \text{Bytes per Parameter} + \
 
 #### B. RAM Size Recalculation (100% Dynamic Context & KV-Cache — ZERO Weights)
 Because the RAM IC is freed from storing model weights, **100% of its physical capacity is allocated to dynamic Key-Value attention cache and scratchpad buffers**:
-$$\text{GQA KV-Cache Bytes / Token} = 2 \times L \times n_{\text{kv\_heads}} \times d_{\text{head}} \times \text{Bytes per Element}$$
+$$\text{GQA KV-Cache Bytes / Token} = 2 \times L \times n_{\text{kv}} \times d_{\text{head}} \times \text{Bytes per Element}$$
 $$\text{MLA Latent KV Bytes / Token} = 2 \times L \times d_c \times \text{Bytes per Element} \quad (d_c = 512\text{ latent dimension})$$
 
 - **8B Model (GQA, $L=32, n_{\text{kv}}=8, d=128$):** $64\text{ KB/token}$ (FP8) or $32\text{ KB/token}$ (FP4).
@@ -224,7 +224,7 @@ TE-1 eliminates all host server dependencies:
 The 3-IC vertically stacked architecture (Main IC + ROM IC + RAM IC) fundamentally re-engineers generative AI inference by eliminating the foundational inefficiencies of traditional GPU clusters:
 
 #### 1. Economic & Lifecycle Benefits (Radical TCO Reduction)
-- **Zero Silicon Obsolescence Across Model Updates:** In traditional architectures, advancing from one foundation model generation to the next often demands replacing multi-thousand-dollar GPU accelerators or completely redesigning custom ASICs. With TE-1, the Main IC and RAM IC are permanent silicon; only the modular ROM IC is replaced on 3, 6, or 12-month model updates, **saving $>\$20\text{M}$ in NRE, mask respins, and tape-out costs**.
+- **Zero Silicon Obsolescence Across Model Updates:** In traditional architectures, advancing from one foundation model generation to the next often demands replacing multi-thousand-dollar GPU accelerators or completely redesigning custom ASICs. With TE-1, the Main IC and RAM IC are permanent silicon; only the modular ROM IC is replaced on 3, 6, or 12-month model updates, **saving > \$20M in NRE, mask respins, and tape-out costs**.
 - **Inexpensive Manufacturing (~$10–$25 per ROM):** 3D Mask ROM / NVM uses simplified via/contact mask layers on mature wafer lines without complex capacitive refresh cells or high-speed SerDes PHYs, reducing model delivery cost to pennies per chip.
 - **Elimination of the "Server Tax":** Operates without expensive host x86/ARM CPUs, PCIe switches, dual-socket server motherboards, multi-terabit network fabrics, or bulky 3kW server chassis.
 - **$>85\%$ Total Cost of Ownership (TCO) Reduction:** Enables commercial providers to serve multi-million token context models profitably or provide **unlimited free-tier services (e.g. Free Kimi 3)**.
@@ -270,18 +270,6 @@ The 3-IC vertically stacked architecture (Main IC + ROM IC + RAM IC) fundamental
 ## 2. Top-Level Hardware Architecture
 
 ```mermaid
-flowchart TB
-    subgraph PhysicalPort ["Single External Physical Interface (Standard RJ45 Copper Jack)"]
-        ETH_WIRE["Cat5e / Cat6 Ethernet Twisted Pair (1 GbE / 2.5 GbE)"]
-        POE_EXTRACT["Integrated PoE+ / PoE++ PD Controller (IEEE 802.3at/bt, 30W-60W)"]
-    end
-
-    subgraph PowerSubsys ["On-Chip PMIC & Voltage Regulators"]
-        BUCK_CORE["0.75V Core Logic Buck Regulator"]
-        BUCK_SRAM["1.1V SRAM Array Buck Regulator"]
-        LDO_IO["1.8V / 3.3V I/O & Memory Regulators"]
-    end
-
 flowchart TB
     subgraph ThreeICStack ["The 3-IC Vertically Stacked Solution (Stacked 3D Sandwich)"]
         direction TB
@@ -580,7 +568,7 @@ flowchart TB
         KV_STORAGE["Network NVMe KV-Cache Tier (2M-5M+ Token Context Overflow)"]
     end
 
-    ROUTER_IC -->|Hardware Top-K Gating Dispatch (RoCEv2 UDP)| EXP_1
+    ROUTER_IC -->|"Hardware Top-K Gating Dispatch (RoCEv2 UDP)"| EXP_1
     ROUTER_IC -->|Dispatches Token ONLY to Active Experts| EXP_K
     EXP_1 -->|Return Expert Output Vector| ROUTER_IC
     EXP_K -->|Return Expert Output Vector| ROUTER_IC
