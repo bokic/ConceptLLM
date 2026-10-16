@@ -1,5 +1,7 @@
 # ConceptLLM: Edge-Cloud AST & Concept Split Architecture for Code
 
+> **Notice:** This document is **Human Designed and AI Written**. :)
+
 An experimental AI coding architecture that decouples **algorithmic and architectural reasoning** from **surface-level syntax, boilerplate formatting, and verbose identifier spelling**.
 
 By replacing massive 150,000–256,000 BPE tokenizers with a unified **20,480 Code-Concept Vocabulary** (combining fixed-arity Prefix AST operators, scoped symbol tables with semantic identifier decomposition, canonical stdlib primitives, technical concept lemmas, and byte-level fallbacks), ConceptLLM slashes boundary projection matrices by **~90%**, compresses repository-scale KV-caches by **~70%–75%**, eliminates syntax and indentation errors by construction, and boosts end-to-end code generation throughput by **3× to 4×**.
